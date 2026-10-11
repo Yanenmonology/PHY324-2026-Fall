@@ -38,3 +38,6 @@
 #define TAG_GY_NC        0x01
 #define TAG_XL_NC        0x02
 #define TAG_TIMESTAMP    0x04
+
+void imu_cs_init(void);
+esp_err_t imu_bus_init
