@@ -31,8 +31,10 @@
 #define R_OUTX_L_A       0x28
 
 #define R_HAODR_CFG      0x62
-#define R_WHO_AM_I_VAL   0x70
 #define R_FIFO_TAG       0x78
+
+
+#define WHO_AM_I_VAL     0x70
 // FIFO department
 #define FIFO_WORD_BYTES  7
 #define TAG_GY_NC        0x01
@@ -40,4 +42,22 @@
 #define TAG_TIMESTAMP    0x04
 
 void imu_cs_init(void);
-esp_err_t imu_bus_init
+esp_err_t imu_bus_init(void);
+esp_err_t imu_read(int index, uint8_t reg, uint8_t *buf, int len);
+esp_err_t imu_write(int index, uint8_t reg, uint8_t val);
+
+//need to check id
+bool imu_init(int index);
+void imu_start_free_running(int index);
+void imu_power_down(int index);
+//ODR + FIFO
+void imu_start_triggered(int index);
+//status
+void imu_fifo_status(int index);
+//readd n words
+esp_err_t imu_fifo_read(int index, uint8_t *buf, int n);
+
+static inline int16_t le16(const uint8_t *p)
+{
+    return (int16_t) (p[0] | (p[1] << 8));
+}
