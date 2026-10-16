@@ -1,1 +1,3 @@
+#environment dependency
 .vscode/
+.phy324venv/
