@@ -1,3 +1,6 @@
 #environment dependency
 .vscode/
 .phy324venv/
+
+#secret file
+Pendulum/code/MCU_Firmware/src/secret.h
