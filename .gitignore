@@ -4,3 +4,6 @@
 
 #secret file
 Pendulum/code/MCU_Firmware/src/secret.h
+
+# sketch and test foler
+Pendulum/code/sketch_test
