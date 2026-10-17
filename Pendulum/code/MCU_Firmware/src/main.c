@@ -6,6 +6,9 @@
 #include "imu.h"
 #include "sync.h"
 #include "sdlog.h"
+#include "esp_server.h"
+#include "netlog.h"
+#include "wifi.h"
 
 #include "driver/gpio.h"
 #include "esp_adc/adc_oneshot.h"
@@ -15,6 +18,7 @@
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "esp_app_desc.h"
 
 static const char *TAG = "weight";
 static bool s_ok[NUM_IMU];
@@ -293,11 +297,21 @@ void Sensor_app_main(void)
 {
     imu_cs_init();
     ESP_ERROR_CHECK(imu_bus_init());
-    #if FW_STAGE == 1
-        inittial_stage();
-    #elif FW_STAGE == 2
-        stage2();
-    #else
-        stage3();
-    #endif
+    netlog_init();
+
+    bool wifi_ok = wifi_connect_blocking(15000);
+    static const cmd_hooks_t hooks = { .is_logging = is_logging, .stop_run = stop_run };
+    bool srv_ok = cmd_server_start(&hooks) == ESP_OK;
+    ota_confirm_boot(wifi_ok && srv_ok);
+    stage_button_start(PIN_STATUS, is_logging);
+    ESP_ERROR_CHECK(imu_bus_init());
+    ESP_LOGI(TAG, "fw %s, running stage %u (%s)", esp_app_get_description()->version,
+             (unsigned)stage_current(), stage_name(stage_current()));
+
+    switch (stage_current())
+    {
+        case 1:  inittial_stage(); break;
+        case 2:  stage2();         break;
+        default: stage3();         break;
+    }
 }
