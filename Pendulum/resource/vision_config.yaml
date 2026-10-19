@@ -1,0 +1,49 @@
+# for the configuration of boar geometer, camera configurations
+
+#1. checker board parameters:
+board:
+  square_x: 0
+  square_y: 0
+  square_mm: 0
+  marker_mm: 0
+  dictionary: DICT_4X4_50 # update with actual board parameter
+  legacy_pattern: false
+
+MBS_marker:
+  dictionary: DICT_4X4_50 #update when printed
+  primart_id: 0
+  ids: [0]
+  size_mm: 0 #update when printed
+
+anchor:
+  ids: [0]
+  size_mm: 0.0
+
+cameras:
+  - name: cam0
+    type: pi
+    exposure_ms: 99 # set by hand, need input
+    rolling_shutter_read_out: 0.0
+    led_threshold: 200 # for qualifying led is "lit up"
+    ked_roi: null #[x,y,w,h] around swing arc, null for whole frame
+  - name: cam1
+    type: DLSR # or iphone
+    exposure_ms: 99 # set by hand, need input
+    flicker_hz: 2000 # house hold led 
+    rational_distortion: false # wide lens usage
+    led_threshold: null
+
+sync:
+  led_threshold: 200
+  roi: null
+  match_tolerance_s: 0.03 #edge matching tolerance
+  max_gap_frame: 2.5
+
+analysis:
+  # g are in m/s^2
+  local_g_1: 9.804173720 # via https://webapp.csrs-scrs.nrcan-rncan.gc.ca/geod/data-donnees/station/cgsn_graph_report.php?id=99192008
+  unc_g_1: 4.5e-9
+  local_g_2: 9.804297341 # via https://webapp.csrs-scrs.nrcan-rncan.gc.ca/geod/data-donnees/station/cgsn.php?id=90521979
+  unc_g_2: 0.000000050
+  local_g_MBS: 9.81 # neede up date sing the MBS board Z axis accel data
+  unc_g_MBS: null

@@ -9,6 +9,8 @@
 #include "esp_server.h"
 #include "netlog.h"
 #include "wifi.h"
+#include "stage.h"
+#include "stage_button.h"
 
 #include "driver/gpio.h"
 #include "esp_adc/adc_oneshot.h"
@@ -23,12 +25,16 @@
 static const char *TAG = "weight";
 static bool s_ok[NUM_IMU];
 static const char *name(int i){
-    static char b[8];
+    static char b[16];
     snprintf(b, sizeof b, "U%d", i + 1);
     return b;
 }
 static adc_oneshot_unit_handle_t s_adc;
 static adc_cali_handle_t s_cali;
+static volatile bool s_logging;
+static volatile bool s_stop_req;
+static bool is_logging(void) { return s_logging; }
+static esp_err_t stop_run(void) { s_stop_req = true; return ESP_OK; }
 
 static void adc_setup(void)
 {
@@ -38,7 +44,7 @@ static void adc_setup(void)
     ESP_ERROR_CHECK(adc_oneshot_config_channel(s_adc, ADC_CH_VBAT, &b));
     ESP_ERROR_CHECK(adc_oneshot_config_channel(s_adc, ADC_CH_VBUS, &b));
     adc_cali_curve_fitting_config_t c = { 
-        .unit_id = ADC_UNIT_1, .atten = ADC_ATTEN_DB_12, .bitwidth = ADC_BIDWIDTH_DEFAULT
+        .unit_id = ADC_UNIT_1, .atten = ADC_ATTEN_DB_12, .bitwidth = ADC_BITWIDTH_DEFAULT
     };
     if(adc_cali_create_scheme_curve_fitting(&c, &s_cali) != ESP_OK)
     {
@@ -56,7 +62,7 @@ static int read_mv(adc_channel_t ch)
         adc_oneshot_read(s_adc, ch, &raw);
         acc += raw;
     }
-    raw = acc / 8
+    raw = acc / 8;
     if(s_cali)
     {
         adc_cali_raw_to_voltage(s_cali, raw, &mv);
@@ -96,7 +102,7 @@ static void inittial_stage(void)
                 le16(b) * G_DPS_PER_LSB, le16(b+2) * G_DPS_PER_LSB, le16(b+4) * G_DPS_PER_LSB
             );
         }
-        vTaskDelay(dpMS_TO_TICKS(1000));
+        vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }
 
@@ -148,7 +154,7 @@ static void stage2(void)
 {
     ESP_LOGI(TAG,"\n[STAGE 2]: ODR trigger self test. \n [s2-stats]HAODR _SEL = %d, ODR code: 0x%X, NODR = %d, BDR: 0x%X",
             HAODR_SEL, TRIG_ODR_CODE, ODR_TRIG_NODR, FIFO_BDR_CODE);
-    for(int i = 0, i < NUM_IMU; i++)
+    for(int i = 0; i < NUM_IMU; i++)
     {
         s_ok[i] = imu_init(i);
     }
@@ -158,7 +164,7 @@ static void stage2(void)
     const int secs = 10;
     int64_t t0 = esp_timer_get_time();
     uint32_t e0 = sync_edge_count();
-    wile(esp_timer_get_time() - t0 < secs * 1000000LL)
+    while(esp_timer_get_time() - t0 < secs * 1000000LL)
     {
         for(int i = 0; i < NUM_IMU; i++)
         {
@@ -168,7 +174,7 @@ static void stage2(void)
     }
     uint32_t edges = sync_edge_count() - e0;
     double mn = 1e9;
-    double mx = 0
+    double mx = 0;
     for (uint32_t k = sync_edge_count() - 30; k < sync_edge_count() - 1; k++)
     {
         int64_t a;
@@ -190,8 +196,8 @@ static void stage2(void)
         printf("  %-5s | %5d | %4d | %2d | %5d | %9.2f | %8.2f\n", name(i), s_xl[i], s_gy[i], s_ts[i],
                s_other[i], (double)s_xl[i] / edges, (double)s_gy[i] / edges);
     }
-    printf("[NOTE] if all accel/edge and gyro/edge are the same on all sensors and equal to expected value.\n 
-        Other wise note down the number and change HAODR_SEL, ODR, BDR codes.");
+    printf("[NOTE] if all accel/edge and gyro/edge are the same on all sensors and equal to expected value.\n"
+        "Other wise note down the number and change HAODR_SEL, ODR, BDR codes.");
     while (1)
     {
         vTaskDelay(pdMS_TO_TICKS(1000));
@@ -200,7 +206,7 @@ static void stage2(void)
 
 static void stage3(void)
 {
-    ESP_LOGI(TAG, "[STAGE 3] logging department. Press boot to stop and close file.")
+    ESP_LOGI(TAG, "[STAGE 3] logging department. Press boot to stop and close file.");
     adc_setup();
     gpio_set_direction(0, GPIO_MODE_INPUT);
     gpio_set_direction(PIN_STATUS, GPIO_MODE_OUTPUT);
@@ -221,9 +227,13 @@ static void stage3(void)
     vTaskDelay(pdMS_TO_TICKS(500));
     start_all_triggered();
     rec_hdr_t note = { .type = REC_NOTE, .t_us = esp_timer_get_time()};
-    char text[96];
-    note.nbytes = snprintf(text, sizeof text, "ref=%dHZ,nodr=%d, odr=0x%X, bdr=0x%X, fs_xl=%d, fs_g=%d",
-                            REF_HZ, ODR_TRIG_NODR, HAODR_SEL, TRIG_ODR_CODE, FIFO_BDR_CODE, FS_XL_CODE, FS_G_CODE);
+    char text[100];
+    int len = snprintf(text, sizeof text,
+                       "stage=3, fw=%s, ref=%dHz, nodr=%d, haodr=%d, odr=0x%X, bdr=0x%X, fs_xl=%d, fs_g=%d",
+                       esp_app_get_description()->version,
+                       REF_HZ, ODR_TRIG_NODR, HAODR_SEL, TRIG_ODR_CODE, FIFO_BDR_CODE, FS_XL_CODE, FS_G_CODE);
+    if (len >= (int)sizeof text) len = sizeof text - 1;
+    note.nbytes = len;
     sdlog_put(&note, text);
 
     static uint8_t buf[140 * FIFO_WORD_BYTES];
@@ -293,7 +303,7 @@ static void stage3(void)
     }
 }
 
-void Sensor_app_main(void)
+void app_main(void)
 {
     imu_cs_init();
     ESP_ERROR_CHECK(imu_bus_init());

@@ -53,7 +53,7 @@ void imu_power_down(int index);
 //ODR + FIFO
 void imu_start_triggered(int index);
 //status
-void imu_fifo_status(int index);
+int imu_fifo_status(int index);
 //readd n words
 esp_err_t imu_fifo_read(int index, uint8_t *buf, int n);
 

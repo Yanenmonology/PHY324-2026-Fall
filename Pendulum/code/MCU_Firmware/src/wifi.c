@@ -1,7 +1,7 @@
 // wifi.c — station-mode Wi-Fi + mDNS.
 
 #include "wifi.h"
-#include "secrets.h"
+#include "secret.h"
 
 #include <string.h>
 

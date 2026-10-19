@@ -56,7 +56,7 @@ static void writer(void *arg)
 esp_err_t sdlog_open(void)
 {
     sdmmc_host_t host = SDMMC_HOST_DEFAULT();
-    host.max_freq_khz = SDMMC_FREQ_HIGHSPEED(); // note: 40MHz
+    host.max_freq_khz = SDMMC_FREQ_HIGHSPEED; // note: 40MHz
     sdmmc_slot_config_t slot = SDMMC_SLOT_CONFIG_DEFAULT();
     slot.width = 4;
     slot.clk = PIN_SD_CLK;
@@ -95,7 +95,7 @@ esp_err_t sdlog_open(void)
     ESP_LOGI(TAG, "logging to %s", path);
     s_rb = xRingbufferCreate(RING_BYTES, RINGBUF_TYPE_NOSPLIT);
     s_run = true;
-    xTaskCreatePinnedToCore(write, "sdwriter", 6144, NULL, 3, &s_task, 0);
+    xTaskCreatePinnedToCore(writer, "sdwriter", 6144, NULL, 3, &s_task, 0);
     return ESP_OK;
 }
 
@@ -103,7 +103,7 @@ bool sdlog_put(const rec_hdr_t *h, const void *payload)
 {
     size_t total = sizeof *h + h->nbytes;
     void *dst;
-    if(xRingbufferSendAcquire(s_rb, &dst, total, 0) != pdTrue)
+    if(xRingbufferSendAcquire(s_rb, &dst, total, 0) != pdTRUE)
     {
         s_drop ++;
         return false;

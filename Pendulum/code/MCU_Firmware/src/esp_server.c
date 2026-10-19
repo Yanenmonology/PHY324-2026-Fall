@@ -2,7 +2,7 @@
 #include "stage.h"
 #include "netlog.h"
 #include "wifi.h"
-#include "secrets.h"
+#include "secret.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

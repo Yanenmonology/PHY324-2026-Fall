@@ -1,6 +1,7 @@
 #pragma once
 #include <stdint.h>
 #include <stddef.h>
+#include <stdbool.h>
 #include "esp_err.h"
 // Binary log little endian style, rec_hdr_t + payload
 #define REC_FIFO 1 //payload n bytes of raw FIFIO w sensor in (0,12)

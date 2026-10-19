@@ -19,7 +19,7 @@ static uint8_t *s_tx, *s_rx;
 //need to check id
 void imu_cs_init(void)
 {
-    for (int 1 = 0, i < NUM_IMU; i++)
+    for (int i = 0; i < NUM_IMU; i++)
     {
         gpio_reset_pin(IMU_CS_GPIO[i]);
         gpio_set_level(IMU_CS_GPIO[i], 1);
@@ -31,15 +31,15 @@ esp_err_t imu_bus_init(void)
 {
     spi_bus_config_t deBus = {
         .mosi_io_num = PIN_SPI_MOSI, .mosi_io_num = PIN_SPI_MISO, .sclk_io_num = PIN_SPI_SCK,
-        .quadwp_io_num = -1, .qudwp_io_num = -1, .max_transfer_sz = MAX_XFER,
+        .quadwp_io_num = -1, .quadwp_io_num = -1, .max_transfer_sz = MAX_XFER,
     };
     ESP_ERROR_CHECK(spi_bus_initialize(SPI2_HOST, &deBus, SPI_DMA_CH_AUTO));
     spi_device_interface_config_t dev = {
         .clock_speed_hz = SPI_CLK_HZ, .mode = 3, .spics_io_num = -1, .queue_size = 1,
     };
     ESP_ERROR_CHECK(spi_bus_add_device(SPI2_HOST, &dev, &s_dev));
-    s_tx = heap_cap_malloc(MAX_XFER + 4, MALLOC_CAP_DMA);
-    s_rx = heap_cap_malloc(MAX_XFER + 4, MALLOC_CAP_DMA);
+    s_tx = heap_caps_malloc(MAX_XFER + 4, MALLOC_CAP_DMA);
+    s_rx = heap_caps_malloc(MAX_XFER + 4, MALLOC_CAP_DMA);
     return (s_tx && s_rx) ? ESP_OK : ESP_ERR_NO_MEM;
 }
 
@@ -130,7 +130,7 @@ void imu_start_triggered(int index)
     imu_write(index, R_CTRL2, (3 << 4) | TRIG_ODR_CODE);
 }
 
-int imu_fifo_level(int index)
+int imu_fifo_status(int index)
 {
     uint8_t s[2] = {0, 0};
     imu_read(index, R_FIFO_STATUS1, s, 2);

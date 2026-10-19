@@ -8,7 +8,7 @@
 #include "esp_err.h"
 
 #define HIST 256
-static volatile int64_t s_t[HIST]
+static volatile int64_t s_t[HIST];
 static volatile uint32_t s_n; //edges passed
 static uint32_t s_popped;
 
@@ -60,7 +60,7 @@ int sync_edge_time(uint32_t index, int64_t *t_us)
     return 0;
 }
 
-int sync_edge_pop(uint32_t *index, int64_t *t_us)
+int sync_edge_pop(uint32_t *index, uint64_t *t_us)
 {
     if(s_popped >= s_n)
     {

@@ -6,4 +6,4 @@
 #define STATUS_LED_GPIO 21
 #define STATUS_LED_ON_LEVEL 1
 
-esp_err_t stage_button_start(bool (*is_logging)(void));
+esp_err_t stage_button_start(int led_gpio, bool (*is_logging)(void));

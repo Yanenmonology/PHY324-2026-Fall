@@ -14,7 +14,7 @@
 #define FS_XL_CODE 1 //CTRL8 fs_xl: {0:2g, 1:4g, 2:8g, 3:16g}
 #define FS_G_CODE 2  //CTRL6 fs_g: {1:250, 2:500, 3:1000, 4:20000}
 #define XL_G_PER_LSB (0.122e-3f) //fit for \pm 4g
-#define F_DPS_PER_LSB (17.5e-3f) //fir for \pm 500 dps
+#define G_DPS_PER_LSB (17.5e-3f) //fir for \pm 500 dps
 
 // Sample department:
 //  - stage 1: 
@@ -27,7 +27,7 @@
 #define TRIG_ODR_CODE 0x7
 #define HAODR_SEL 2 // Gyro on: \pm 1% , gyro off \pm 3%
 #define ODR_TRIG_NODR 10 // 20 samples per period, 200 Hz at 10 Hz
-#define FIFO_BDR_CODE // 0x7 pg60 binary code 0111
+#define FIFO_BDR_CODE 0x7// 0x7 pg60 binary code 0111
 
 //Logging department
 #define POLL_MS 100
