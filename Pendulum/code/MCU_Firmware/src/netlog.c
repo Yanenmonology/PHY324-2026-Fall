@@ -9,7 +9,7 @@
 #include "freertos/task.h"
 
 #define RING_SIZE  8192
-#define LINE_MAX   192
+#define NETLOG_LINE_MAX   192
 #define PKT_MAX    1024
 
 static char        s_ring[RING_SIZE];
@@ -36,12 +36,12 @@ static int hook_vprintf(const char *fmt, va_list ap)
     va_list ap2;
     va_copy(ap2, ap);
     int n = (s_orig ? s_orig : vprintf)(fmt, ap);
-    char line[LINE_MAX];
+    char line[NETLOG_LINE_MAX];
     int m = vsnprintf(line, sizeof line, fmt, ap2);
     va_end(ap2);
     if (m > 0) 
     {
-        ring_put(line, m < LINE_MAX ? (size_t)m : LINE_MAX - 1);
+        ring_put(line, m < NETLOG_LINE_MAX ? (size_t)m : NETLOG_LINE_MAX - 1);
     }
     return n;
 }

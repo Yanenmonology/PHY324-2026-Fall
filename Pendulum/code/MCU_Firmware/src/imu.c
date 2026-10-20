@@ -30,7 +30,7 @@ void imu_cs_init(void)
 esp_err_t imu_bus_init(void)
 {
     spi_bus_config_t deBus = {
-        .mosi_io_num = PIN_SPI_MOSI, .mosi_io_num = PIN_SPI_MISO, .sclk_io_num = PIN_SPI_SCK,
+        .mosi_io_num = PIN_SPI_MOSI, .miso_io_num = PIN_SPI_MISO, .sclk_io_num = PIN_SPI_SCK,
         .quadwp_io_num = -1, .quadwp_io_num = -1, .max_transfer_sz = MAX_XFER,
     };
     ESP_ERROR_CHECK(spi_bus_initialize(SPI2_HOST, &deBus, SPI_DMA_CH_AUTO));
@@ -40,7 +40,13 @@ esp_err_t imu_bus_init(void)
     ESP_ERROR_CHECK(spi_bus_add_device(SPI2_HOST, &dev, &s_dev));
     s_tx = heap_caps_malloc(MAX_XFER + 4, MALLOC_CAP_DMA);
     s_rx = heap_caps_malloc(MAX_XFER + 4, MALLOC_CAP_DMA);
-    return (s_tx && s_rx) ? ESP_OK : ESP_ERR_NO_MEM;
+    if(!s_rx || !s_tx)
+    {
+        return ESP_ERR_NO_MEM;
+    }
+    memset(s_tx, 0, 4);
+    spi_transaction_t t = { .length = 8, .tx_buffer = s_tx, .rx_buffer = s_rx };
+    return spi_device_polling_transmit(s_dev, &t);
 }
 
 static esp_err_t xfer(int index, int total)
@@ -50,6 +56,7 @@ static esp_err_t xfer(int index, int total)
     };
     gpio_set_level(IMU_CS_GPIO[index], 0);
     esp_err_t e = spi_device_polling_transmit(s_dev, &t);
+    gpio_set_level(IMU_CS_GPIO[index], 1);// I forgot to realse them, bus will be jammed
     return e;
 }
 
@@ -72,6 +79,14 @@ esp_err_t imu_write(int index, uint8_t reg, uint8_t val)
     return xfer(index, 2);
 }
 
+void imu_disable_i2c_all(void)
+{
+    for (int i = 0; i < NUM_IMU; i++)
+    {
+        imu_write(i, R_IF_CFG, IF_CFG_I2C_I3C_DIS);
+    }
+}
+
 static uint8_t rd1(int index, uint8_t reg)
 {
     uint8_t v = 0;
@@ -82,15 +97,13 @@ static uint8_t rd1(int index, uint8_t reg)
 
 bool imu_init(int index)
 {
-    //disable I2C disable first
-    uint8_t cfg = rd1(index, R_IF_CFG);
-    imu_write(index, R_IF_CFG, cfg | 0x01); // disable
-    imu_write(index, R_CTRL3, 0x01);  // reset
+    imu_write(index, R_IF_CFG, IF_CFG_I2C_I3C_DIS);
+    imu_power_down(index);
+    imu_write(index, R_CTRL3, 0x01);  // SW_RESET
     vTaskDelay(pdMS_TO_TICKS(5));
     for(int i = 0; i < 20 &&(rd1(index, R_CTRL3) & 0x01); i++) vTaskDelay(1);
-    cfg = rd1(index, R_IF_CFG);
-    imu_write(index, R_IF_CFG, cfg | 0x01);
-    imu_write(index, R_FIFO_CTRL3, 0x44); // 01000100, dbu @ bit 6, and if_inc @ bit 2
+    imu_write(index, R_IF_CFG, IF_CFG_I2C_I3C_DIS);   // reset restores I2C: disable again
+    imu_write(index, R_CTRL3, 0x44);
 
     uint8_t id = rd1(index, R_WHO_AM_I);
     if(id != WHO_AM_I_VAL){
@@ -117,23 +130,32 @@ void imu_start_free_running(int index)
 void imu_start_triggered(int index)
 {
     imu_power_down(index);
+    imu_power_down(index);
     imu_write(index, R_HAODR_CFG, HAODR_SEL);
     imu_write(index, R_ODR_TRIG_CFG, ODR_TRIG_NODR);
+    imu_write(index, R_CTRL1, (3 << 4));
+    imu_write(index, R_CTRL2, (3 << 4));
     imu_write(index, R_CTRL4, 0x01);
     imu_write(index, R_CTRL8, FS_XL_CODE);
     imu_write(index, R_CTRL6, FS_G_CODE);
-    //FIFO department, op mode 3 bits 6,5,4
+    imu_write(index, R_FUNCTIONS_ENABLE, FUNC_TIMESTAMP_EN);
     imu_write(index, R_FIFO_CTRL3, (FIFO_BDR_CODE << 4) | FIFO_BDR_CODE);
-    imu_write(index, R_FIFO_CTRL4, 0x01 | (0x1 << 6));
+    imu_write(index, R_FIFO_CTRL4, FIFO_MODE_CONTINUOUS | (FIFO_TS_DEC << 6));
     imu_write(index, R_CTRL4, 0x03);
     imu_write(index, R_CTRL1, (3 << 4) | TRIG_ODR_CODE);
     imu_write(index, R_CTRL2, (3 << 4) | TRIG_ODR_CODE);
 }
 
-int imu_fifo_status(int index)
+void imu_enable_drdy_int1(int index)
+{
+    imu_write(index, R_INT1_CTRL, INT1_DRDY_XL);
+}
+
+int imu_fifo_status(int index, uint8_t *status2)
 {
     uint8_t s[2] = {0, 0};
-    imu_read(index, R_FIFO_STATUS1, s, 2);
+    if (imu_read(index, R_FIFO_STATUS1, s, 2) != ESP_OK) return -1;
+    if (status2) *status2 = s[1];
     return s[0] | ((s[1] & 0x01) << 8);
 }
 
